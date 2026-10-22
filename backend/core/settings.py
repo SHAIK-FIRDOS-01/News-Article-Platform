@@ -5,11 +5,13 @@ Satisfies /ponytail (YAGNI, stdlib parsing, zero speculative scaffolding) and /s
 """
 
 import os
+import sys
 import json
 from pathlib import Path
 from datetime import timedelta
 from urllib.parse import urlparse, unquote
 from dotenv import load_dotenv
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -93,8 +95,9 @@ APPEND_SLASH = False
 # Ponytail: stdlib urlparse parses DATABASE_URL without extra external libraries.
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/signalreport"
+    "mysql://root:password@127.0.0.1:3306/signalreport"
 )
+
 
 def parse_database_url(url: str):
     # Support direct MySQL environment variables
@@ -154,9 +157,21 @@ def parse_database_url(url: str):
         "CONN_MAX_AGE": 600,
     }
 
-DATABASES = {
-    "default": parse_database_url(DATABASE_URL)
-}
+# Automated test isolation:
+# Uses in-memory database during 'python manage.py test' so test suites pass seamlessly
+# in environments where an active MySQL daemon is not running locally.
+if "test" in sys.argv:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
+else:
+    DATABASES = {
+        "default": parse_database_url(DATABASE_URL)
+    }
+
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

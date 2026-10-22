@@ -3,14 +3,14 @@
 # 📰 SignalReport
 ### Enterprise Newsroom Intelligence & Editorial Feed Platform
 
-A high-throughput, cryptographically hardened news intelligence platform built with **Django 5.0**, **Django REST Framework**, **PostgreSQL**, and a **Swiss Modernist React 18** interface.
+A high-throughput, cryptographically hardened news intelligence platform built with **Django 5.0**, **Django REST Framework**, **MySQL 8.0+**, and a **Swiss Modernist React 18** interface.
 
 <br/>
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-5.0+-092E20?style=for-the-badge&logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![DRF](https://img.shields.io/badge/DRF-3.15+-red?style=for-the-badge)](https://www.django-rest-framework.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2F17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-4479A8?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tests](https://img.shields.io/badge/Tests-171%20Passed-brightgreen?style=for-the-badge)](#-testing--code-quality)
@@ -49,12 +49,13 @@ A high-throughput, cryptographically hardened news intelligence platform built w
 
 | Dimension | Implementation Details |
 | :--- | :--- |
-| **Backend Architecture** | Decoupled 3-domain Django architecture (`authentication`, `feed`, `ingestion`) with DRF REST endpoints. |
+| **Backend Architecture** | Decoupled 3-domain Django architecture (`authentication`, `feed`, `ingestion`) with DRF REST endpoints and MySQL 8.0+ persistence. |
 | **Frontend Architecture** | Pure React 18 SPA (Vite + Tailwind CSS), Swiss International Typographic design, zero third-party state libraries. |
 | **Security & Hardening** | Cloudflare CIDR socket verification, sliding-window login rate limiting, OWASP security headers, zero-trust IDOR controls. |
 | **Upstream Governance** | 80 requests/day hard cap, 90-minute per-category cooldown, 6-hour circuit breaker for external syndication (GNews). |
 | **Automated Testing** | **171 tests total (100% passing)** — 34 Django unit/security tests + 137 Vitest React component & integration tests. |
 | **Infrastructure Footprint** | Lean footprint: no external Redis, Celery, or message brokers required for background news polling. |
+
 
 ---
 
@@ -108,16 +109,16 @@ flowchart TD
     end
 
     subgraph Data ["Persistence & External Services"]
-        Postgres[("PostgreSQL\n(Users, Articles, Bookmarks, Logs)")]
+        MySQL[("MySQL 8.0+\n(Users, Articles, Bookmarks, Logs)")]
         GNews["GNews API v4\n(External Syndication)"]
     end
 
     Client -->|"HTTPS / REST"| CF
     MW_Rate --> AppAuth & AppFeed
     AppIngest -->|"Syndicate News"| GNews
-    AppAuth <--> Postgres
-    AppFeed <--> Postgres
-    AppIngest <--> Postgres
+    AppAuth <--> MySQL
+    AppFeed <--> MySQL
+    AppIngest <--> MySQL
 ```
 
 ---
@@ -128,9 +129,10 @@ flowchart TD
 | :--- | :--- | :--- |
 | **Frontend** | React 18, Vite 5, Tailwind CSS | High-contrast Swiss Modernist typography, modular error boundaries, optimistic state. |
 | **Backend** | Python 3.10+, Django 5.0, DRF 3.15+ | Decoupled domain architecture, custom middleware pipeline, clean REST contract. |
-| **Database** | PostgreSQL 16 / 17 | Normalized schema, B-tree indexed cursor pagination, foreign key cascades. |
+| **Database** | MySQL 8.0+ (InnoDB) | Normalized schema, utf8mb4 charset, indexed cursor pagination, foreign key cascades. |
 | **External HTTP** | HTTPX | Asynchronous and synchronous HTTP client with automated retries and timeout controls. |
 | **Testing** | Vitest, Testing Library, Django TestRunner | 171 automated tests across unit, integration, and security layers. |
+
 
 ---
 
@@ -149,7 +151,7 @@ News-Article/
 │   ├── core/                        # Django configuration, security middlewares, settings
 │   ├── manage.py
 │   ├── requirements.txt
-│   └── schema_mysql.sql             # Legacy/reference schema definition
+│   └── schema_mysql.sql             # Production MySQL 8.0+ relational schema DDL
 └── frontend/                        # React 18 Single Page Application
     ├── src/
     │   ├── components/              # Swiss Modernist UI components (Masthead, Cards, Drawers)
@@ -168,9 +170,16 @@ News-Article/
 ### Prerequisites
 * **Python**: 3.10 or higher
 * **Node.js**: 18.x or higher
-* **PostgreSQL**: 15+ (or SQLite for quick local evaluation)
+* **MySQL**: 8.0 or higher (or SQLite for quick local evaluation)
 
-### 1. Backend Setup
+### 1. Database Setup (MySQL 8.0+)
+Create the MySQL database:
+```sql
+CREATE DATABASE signalreport CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+*(Optional: Initialize directly via production DDL: `mysql -u root -p signalreport < backend/schema_mysql.sql`)*
+
+### 2. Backend Setup
 
 ```powershell
 # Navigate into backend directory
@@ -183,7 +192,7 @@ python -m venv .venv
 # Install dependencies
 pip install -r requirements.txt
 
-# Run migrations
+# Run migrations (connects via DATABASE_URL in .env)
 python manage.py migrate
 
 # (Optional) Seed sample news from external API
@@ -193,11 +202,12 @@ python manage.py fetch_news
 python manage.py runserver 127.0.0.1:8000
 ```
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 
 ```powershell
 # In a separate terminal, navigate into frontend directory
 cd frontend
+
 
 # Install Node dependencies
 npm install
