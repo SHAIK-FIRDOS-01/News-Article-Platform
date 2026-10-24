@@ -29,7 +29,17 @@ JWT_SECRET_KEY = SECRET_KEY
 
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = ["*"] if DEBUG else ["localhost", "127.0.0.1", "0.0.0.0"]
+raw_allowed_hosts = os.getenv("ALLOWED_HOSTS", "")
+if DEBUG:
+    ALLOWED_HOSTS = ["*"]
+elif raw_allowed_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in raw_allowed_hosts.split(",") if h.strip()]
+else:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0", ".onrender.com"]
+
+render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if render_hostname and render_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_hostname)
 
 # Application definition
 INSTALLED_APPS = [
@@ -55,6 +65,7 @@ MIDDLEWARE = [
     "core.security.SecurityHeadersMiddleware",
     "core.security.LoginRateLimitMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -116,8 +127,9 @@ def parse_database_url(url: str):
             "CONN_MAX_AGE": 600,
         }
 
-    # Normalize SQLAlchemy async prefixes and MySQL prefixes
+    # Normalize SQLAlchemy async prefixes, Render postgres:// prefixes, and MySQL prefixes
     cleaned_url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    cleaned_url = cleaned_url.replace("postgres://", "postgresql://", 1)
     cleaned_url = cleaned_url.replace("mysql+pymysql://", "mysql://", 1)
     cleaned_url = cleaned_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
 
@@ -189,6 +201,17 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django REST Framework Configuration
@@ -278,6 +301,23 @@ else:
     CORS_ALLOWED_ORIGINS = default_cors
 
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF Trusted Origins for Render & Vercel
+raw_csrf = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+if raw_csrf:
+    try:
+        parsed_csrf = json.loads(raw_csrf) if raw_csrf.startswith("[") else [o.strip() for o in raw_csrf.split(",")]
+        CSRF_TRUSTED_ORIGINS = list(set([o.strip() for o in parsed_csrf if o.strip()]))
+    except Exception:
+        CSRF_TRUSTED_ORIGINS = []
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        origin for origin in CORS_ALLOWED_ORIGINS if origin.startswith("http://") or origin.startswith("https://")
+    ]
+    if render_hostname:
+        CSRF_TRUSTED_ORIGINS.append(f"https://{render_hostname}")
+    CSRF_TRUSTED_ORIGINS.append("https://*.onrender.com")
+    CSRF_TRUSTED_ORIGINS.append("https://*.vercel.app")
 
 # Cookie Security Flags
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "False").lower() in ("true", "1", "yes")

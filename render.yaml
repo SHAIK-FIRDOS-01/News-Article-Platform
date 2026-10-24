@@ -1,0 +1,43 @@
+# ==============================================================================
+# Render Blueprint Specification for SignalReport Platform
+# Docs: https://render.com/docs/blueprint-spec
+# ==============================================================================
+
+databases:
+  - name: signalreport-db
+    databaseName: signalreport
+    user: signalreport
+    plan: free
+
+services:
+  - type: web
+    name: signalreport-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate && python manage.py fetch_news --seed"
+    startCommand: "gunicorn core.wsgi:application"
+    healthCheckPath: /health/
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.10.11"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalreport-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_HOSTS
+        value: "localhost,127.0.0.1,.onrender.com"
+      - key: COOKIE_SECURE
+        value: "True"
+      - key: COOKIE_SAMESITE
+        value: "None"
+      - key: CORS_ORIGINS
+        value: '["https://*.vercel.app", "http://localhost:5173"]'
+      - key: CSRF_TRUSTED_ORIGINS
+        value: '["https://*.onrender.com", "https://*.vercel.app"]'

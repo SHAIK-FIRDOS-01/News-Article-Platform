@@ -11,7 +11,9 @@ export const ERROR_CODES = Object.freeze({
   HTTP_5XX: 'HTTP_5xx',
 });
 
-export const DEFAULT_TIMEOUT_MS = 8000;
+export const DEFAULT_TIMEOUT_MS = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_TIMEOUT_MS)
+  ? parseInt(import.meta.env.VITE_API_TIMEOUT_MS, 10)
+  : 8000;
 
 // Module-level mutex holding in-flight token refresh promise for concurrent 401 queuing
 let activeRefreshPromise = null;

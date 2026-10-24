@@ -41,13 +41,25 @@ CLOUDFLARE_IPV6_CIDRS: List[ipaddress.IPv6Network] = [
     ipaddress.ip_network("2c0f:f248::/32"),
 ]
 
-# Local and test networks permitted for internal proxying in dev/test
+# Local, test, and private cloud proxy networks permitted for internal proxying (Render, Docker, AWS)
 LOCAL_TRUSTED_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),
     ipaddress.ip_network("::1/128"),
 ]
 
-ALL_TRUSTED_NETWORKS = CLOUDFLARE_IPV4_CIDRS + CLOUDFLARE_IPV6_CIDRS + LOCAL_TRUSTED_NETWORKS
+PRIVATE_PROXY_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("100.64.0.0/10"),
+]
+
+ALL_TRUSTED_NETWORKS = (
+    CLOUDFLARE_IPV4_CIDRS
+    + CLOUDFLARE_IPV6_CIDRS
+    + LOCAL_TRUSTED_NETWORKS
+    + PRIVATE_PROXY_NETWORKS
+)
 
 
 def is_trusted_peer(host: str) -> bool:
