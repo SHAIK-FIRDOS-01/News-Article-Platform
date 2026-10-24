@@ -106,12 +106,15 @@ APPEND_SLASH = False
 # Ponytail: stdlib urlparse parses DATABASE_URL without extra external libraries.
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql://root:password@127.0.0.1:3306/signalreport"
+    "sqlite:///db.sqlite3"
 )
 
 
 def parse_database_url(url: str):
-    # Support direct MySQL environment variables
+    if not url or not url.strip():
+        url = "sqlite:///db.sqlite3"
+
+    # Support direct MySQL environment variables if explicitly configured
     if os.getenv("MYSQL_DATABASE"):
         return {
             "ENGINE": "django.db.backends.mysql",
@@ -133,15 +136,6 @@ def parse_database_url(url: str):
     cleaned_url = cleaned_url.replace("mysql+pymysql://", "mysql://", 1)
     cleaned_url = cleaned_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
 
-    if cleaned_url.startswith("sqlite"):
-        db_path = cleaned_url.replace("sqlite:///", "").replace("sqlite://", "") or ":memory:"
-        if db_path != ":memory:" and not os.path.isabs(db_path):
-            db_path = str(BASE_DIR / db_path)
-        return {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": db_path,
-        }
-
     if cleaned_url.startswith("mysql"):
         parsed = urlparse(cleaned_url)
         return {
@@ -158,15 +152,25 @@ def parse_database_url(url: str):
             "CONN_MAX_AGE": 600,
         }
 
-    parsed = urlparse(cleaned_url)
+    if cleaned_url.startswith("postgresql"):
+        parsed = urlparse(cleaned_url)
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote(parsed.path.lstrip("/")),
+            "USER": unquote(parsed.username or ""),
+            "PASSWORD": unquote(parsed.password or ""),
+            "HOST": parsed.hostname or "localhost",
+            "PORT": parsed.port or 5432,
+            "CONN_MAX_AGE": 600,
+        }
+
+    # Default fallback: SQLite3
+    db_path = cleaned_url.replace("sqlite:///", "").replace("sqlite://", "") or "db.sqlite3"
+    if db_path != ":memory:" and not os.path.isabs(db_path):
+        db_path = str(BASE_DIR / db_path)
     return {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": unquote(parsed.path.lstrip("/")),
-        "USER": unquote(parsed.username or ""),
-        "PASSWORD": unquote(parsed.password or ""),
-        "HOST": parsed.hostname or "localhost",
-        "PORT": parsed.port or 5432,
-        "CONN_MAX_AGE": 600,
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": db_path,
     }
 
 # Automated test isolation:
