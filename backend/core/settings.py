@@ -7,6 +7,7 @@ Satisfies /ponytail (YAGNI, stdlib parsing, zero speculative scaffolding) and /s
 import os
 import sys
 import json
+import re
 from pathlib import Path
 from datetime import timedelta
 from urllib.parse import urlparse, unquote
@@ -295,14 +296,33 @@ default_cors = [
     "http://127.0.0.1:8000",
 ]
 
+# Permit all Vercel domains (including preview branches) and Render domains via regex
+default_cors_regex = [
+    r"^https:\/\/.*\.vercel\.app$",
+    r"^https:\/\/.*\.onrender\.com$",
+]
+
+cors_origins_list = []
+cors_regex_list = list(default_cors_regex)
+
 if raw_cors:
     try:
         parsed_cors = json.loads(raw_cors) if raw_cors.startswith("[") else [o.strip() for o in raw_cors.split(",")]
-        CORS_ALLOWED_ORIGINS = list(set(default_cors + [o.strip() for o in parsed_cors if o.strip()]))
+        for item in parsed_cors:
+            item_str = item.strip()
+            if not item_str:
+                continue
+            if "*" in item_str:
+                # Convert wildcard pattern (e.g. https://*.vercel.app) to regex
+                escaped = re.escape(item_str).replace(r"\*", ".*")
+                cors_regex_list.append(f"^{escaped}$")
+            else:
+                cors_origins_list.append(item_str)
     except Exception:
-        CORS_ALLOWED_ORIGINS = default_cors
-else:
-    CORS_ALLOWED_ORIGINS = default_cors
+        cors_origins_list = []
+
+CORS_ALLOWED_ORIGINS = list(set(default_cors + cors_origins_list))
+CORS_ALLOWED_ORIGIN_REGEXES = list(set(cors_regex_list))
 
 CORS_ALLOW_CREDENTIALS = True
 
